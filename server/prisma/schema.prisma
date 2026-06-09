@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum package_status {
+  to_be_picked_up
+  picked_up
+  added_to_bag
+  en_route
+  arrived
+  scheduled_for_delivery
+  out_for_delivery
+}
+
+model Region {
+  id          Int       @id @default(autoincrement())
+  region_code String    @unique @db.VarChar(10)
+  region_name String    @db.VarChar(100)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  packages    Package[]
+
+  @@map("regions")
+}
+
+model Package {
+  id               Int            @id @default(autoincrement())
+  tracking_id      String         @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sender_name      String         @db.VarChar(100)
+  sender_address   String
+  receiver_name    String         @db.VarChar(100)
+  receiver_address String
+  weight           Decimal        @db.Decimal(10, 2)
+  region_id        Int?
+  status           package_status @default(to_be_picked_up)
+  current_location String?
+  delay_reason     String?
+  created_at       DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?      @default(now()) @db.Timestamp(6)
+  region           Region?        @relation(fields: [region_id], references: [id])
+  sale             Sale?
+
+  @@map("packages")
+}
+
+model Sale {
+  id         Int      @id @default(autoincrement())
+  package_id Int      @unique
+  tracking_id String? @db.Uuid
+  amount     Decimal  @db.Decimal(10, 2)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  package    Package  @relation(fields: [package_id], references: [id], onDelete: Cascade)
+
+  @@map("sales")
+}
