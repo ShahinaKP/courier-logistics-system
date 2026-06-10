@@ -6,6 +6,11 @@ import express from "express";
 import cors from "cors";
 import packageRoutes from "./routes/packageRoutes";
 import regionRoutes from "./routes/regionRoutes";
+import { processRawUpdates } from "./controllers/packageController";
+
+// Run ETL processor every 1 minute
+setInterval(processRawUpdates, 60 * 1000);
+console.log("ETL processor started — running every 1 minute");
 
 const app = express();
 const PORT = process.env.PORT || 5000;

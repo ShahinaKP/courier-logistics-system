@@ -84,6 +84,26 @@ export const createPackage = async (
       },
     });
 
+    // Call Stage 2 webhook
+    try {
+      await fetch("http://localhost:5001/api/packages/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tracking_id: newPackage.tracking_id,
+          sender_name: newPackage.sender_name,
+          sender_address: newPackage.sender_address,
+          receiver_name: newPackage.receiver_name,
+          receiver_address: newPackage.receiver_address,
+          weight: newPackage.weight,
+          region_id: newPackage.region_id,
+        }),
+      });
+      console.log("Webhook sent to Stage 2 successfully");
+    } catch (webhookErr) {
+      console.error("Webhook to Stage 2 failed:", webhookErr);
+    }
+
     res.status(201).json({
       message: "Package created successfully",
       package: newPackage,
@@ -92,5 +112,66 @@ export const createPackage = async (
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// POST receive raw updates from Stage 2 ETL
+export const receiveRawUpdates = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const updates = req.body; // array of package updates
+
+    await prisma.rawUpdate.create({
+      data: {
+        payload: updates,
+        processed: false,
+      },
+    });
+
+    res.json({ message: "Raw updates received", count: updates.length });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Background job — process raw updates
+export const processRawUpdates = async () => {
+  try {
+    const rawUpdates = await prisma.rawUpdate.findMany({
+      where: { processed: false },
+    });
+
+    for (const raw of rawUpdates) {
+      const updates = raw.payload as Array<{
+        tracking_id: string;
+        status: string;
+        current_location?: string;
+        delay_reason?: string;
+      }>;
+
+      for (const update of updates) {
+        await prisma.package.updateMany({
+          where: { tracking_id: update.tracking_id },
+          data: {
+            status: update.status as any,
+            current_location: update.current_location || null,
+            delay_reason: update.delay_reason || null,
+            updated_at: new Date(),
+          },
+        });
+      }
+
+      await prisma.rawUpdate.update({
+        where: { id: raw.id },
+        data: { processed: true, processed_at: new Date() },
+      });
+    }
+
+    console.log(`Processed ${rawUpdates.length} raw updates`);
+  } catch (err) {
+    console.error("Error processing raw updates:", err);
   }
 };
