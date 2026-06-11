@@ -7,6 +7,7 @@ import cors from "cors";
 import packageRoutes from "./routes/packageRoutes";
 import regionRoutes from "./routes/regionRoutes";
 import { processRawUpdates } from "./controllers/packageController";
+import authRoutes from "./routes/authRoutes";
 
 // Run ETL processor every 1 minute
 setInterval(processRawUpdates, 60 * 1000);
@@ -18,6 +19,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+app.use("/api/auth", authRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/regions", regionRoutes);
 
