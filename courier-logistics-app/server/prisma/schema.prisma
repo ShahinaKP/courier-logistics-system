@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Region {
+  id              Int             @id @default(autoincrement())
+  region_code     String          @unique @db.VarChar(10)
+  region_name     String          @db.VarChar(100)
+  created_at      DateTime?       @default(now()) @db.Timestamp(6)
+  bags            Bag[]
+  packages        Package[]
+  truck_schedules TruckSchedule[]
+
+  @@map("regions")
+}
+
+model Package {
+  id               Int            @id @default(autoincrement())
+  tracking_id      String         @unique @db.Uuid
+  sender_name      String         @db.VarChar(100)
+  sender_address   String
+  receiver_name    String         @db.VarChar(100)
+  receiver_address String
+  weight           Decimal        @db.Decimal(10, 2)
+  region_id        Int?
+  status           package_status @default(to_be_picked_up)
+  current_location String?
+  delay_reason     String?
+  created_at       DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at       DateTime?      @default(now()) @db.Timestamp(6)
+  package_bags     PackageBag[]
+  region           Region?        @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("packages")
+}
+
+model Bag {
+  id           Int          @id @default(autoincrement())
+  bag_code     String       @unique @db.VarChar(20)
+  region_id    Int?
+  direction    String       @db.VarChar(20)
+  status       String       @default("open") @db.VarChar(20)
+  created_at   DateTime?    @default(now()) @db.Timestamp(6)
+  updated_at   DateTime?    @default(now()) @db.Timestamp(6)
+  region       Region?      @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  package_bags PackageBag[]
+  truck_bags   TruckBag[]
+
+  @@map("bags")
+}
+
+model PackageBag {
+  id         Int       @id @default(autoincrement())
+  package_id Int?
+  bag_id     Int?
+  added_at   DateTime? @default(now()) @db.Timestamp(6)
+  bag        Bag?      @relation(fields: [bag_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  package    Package?  @relation(fields: [package_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("package_bags")
+}
+
+model Truck {
+  id              Int             @id @default(autoincrement())
+  truck_code      String          @unique @db.VarChar(20)
+  capacity        Int             @default(10)
+  status          String          @default("available") @db.VarChar(20)
+  created_at      DateTime?       @default(now()) @db.Timestamp(6)
+  truck_schedules TruckSchedule[]
+
+  @@map("trucks")
+}
+
+model TruckSchedule {
+  id                  Int        @id @default(autoincrement())
+  truck_id            Int?
+  region_id           Int?
+  scheduled_departure DateTime   @db.Timestamp(6)
+  actual_departure    DateTime?  @db.Timestamp(6)
+  status              String     @default("scheduled") @db.VarChar(20)
+  delay_reason        String?
+  created_at          DateTime?  @default(now()) @db.Timestamp(6)
+  truck_bags          TruckBag[]
+  region              Region?    @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  truck               Truck?     @relation(fields: [truck_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("truck_schedules")
+}
+
+model TruckBag {
+  id                Int            @id @default(autoincrement())
+  truck_schedule_id Int?
+  bag_id            Int?
+  loaded_at         DateTime?      @default(now()) @db.Timestamp(6)
+  bag               Bag?           @relation(fields: [bag_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  truck_schedule    TruckSchedule? @relation(fields: [truck_schedule_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@map("truck_bags")
+}
+
+model RawUpdate {
+  id           Int       @id @default(autoincrement())
+  payload      Json
+  processed    Boolean?  @default(false)
+  received_at  DateTime? @default(now()) @db.Timestamp(6)
+  processed_at DateTime? @db.Timestamp(6)
+
+  @@map("raw_updates")
+}
+
+enum package_status {
+  to_be_picked_up
+  picked_up
+  added_to_bag
+  en_route
+  arrived
+  scheduled_for_delivery
+  out_for_delivery
+}
