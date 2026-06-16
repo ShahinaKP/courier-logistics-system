@@ -1,5 +1,5 @@
 import { getToken } from "./authApi";
-import type { CreatePackagePayload, Package, Region } from "../types";
+import type { CreatePackagePayload, Package } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -28,10 +28,5 @@ export const createPackage = async (payload: CreatePackagePayload) => {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to create package");
-  return res.json();
-};
-
-export const fetchRegions = async (): Promise<Region[]> => {
-  const res = await fetch(`${BASE_URL}/regions`, { headers: authHeaders() });
   return res.json();
 };

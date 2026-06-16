@@ -6,15 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-model Region {
-  id          Int       @id @default(autoincrement())
-  region_code String    @unique @db.VarChar(10)
-  region_name String    @db.VarChar(100)
-  created_at  DateTime? @default(now()) @db.Timestamp(6)
-  packages    Package[]
-
-  @@map("regions")
-}
 
 model Package {
   id               Int            @id @default(autoincrement())
@@ -24,13 +15,11 @@ model Package {
   receiver_name    String         @db.VarChar(100)
   receiver_address String
   weight           Decimal        @db.Decimal(10, 2)
-  region_id        Int?
   status           package_status @default(to_be_picked_up)
   current_location String?
   delay_reason     String?
   created_at       DateTime?      @default(now()) @db.Timestamp(6)
   updated_at       DateTime?      @default(now()) @db.Timestamp(6)
-  region           Region?        @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   sale             Sale[]
 
   @@map("packages")

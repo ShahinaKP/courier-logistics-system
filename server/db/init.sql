@@ -12,13 +12,6 @@ CREATE TYPE package_status AS ENUM (
   'out_for_delivery'
 );
 
--- Regions table
-CREATE TABLE regions (
-  id SERIAL PRIMARY KEY,
-  region_code VARCHAR(10) NOT NULL UNIQUE,
-  region_name VARCHAR(100) NOT NULL,
-  created_at TIMESTAMP DEFAULT NOW()
-);
 
 -- Packages table
 CREATE TABLE packages (
@@ -29,7 +22,6 @@ CREATE TABLE packages (
   receiver_name VARCHAR(100) NOT NULL,
   receiver_address TEXT NOT NULL,
   weight DECIMAL(10, 2) NOT NULL,
-  region_id INT REFERENCES regions(id),
   status package_status NOT NULL DEFAULT 'to_be_picked_up',
   current_location TEXT,
   delay_reason TEXT,
@@ -45,11 +37,3 @@ CREATE TABLE sales (
   amount DECIMAL(10, 2) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW()
 );
-
--- Seed regions
-INSERT INTO regions (region_code, region_name) VALUES
-  ('RG-N', 'North Region'),
-  ('RG-S', 'South Region'),
-  ('RG-E', 'East Region'),
-  ('RG-W', 'West Region'),
-  ('RG-C', 'Central Region');

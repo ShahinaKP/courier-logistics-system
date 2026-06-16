@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { createPackage, fetchRegions } from "../api/packageApi";
-import type { Region } from "../types";
+import { useState } from "react";
+import { createPackage } from "../api/packageApi";
 
 import {
   Card,
@@ -10,25 +9,15 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
 import { Button } from "../components/ui/button";
 
 const NewPackage = () => {
-  const [regions, setRegions] = useState<Region[]>([]);
-
   const [form, setForm] = useState({
     sender_name: "",
     sender_address: "",
     receiver_name: "",
     receiver_address: "",
     weight: "",
-    region_id: "",
   });
 
   const [result, setResult] = useState<{
@@ -37,10 +26,6 @@ const NewPackage = () => {
   } | null>(null);
 
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetchRegions().then(setRegions);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +37,6 @@ const NewPackage = () => {
       const data = await createPackage({
         ...form,
         weight: parseFloat(form.weight),
-        region_id: parseInt(form.region_id),
       });
 
       setResult({
@@ -66,7 +50,6 @@ const NewPackage = () => {
         receiver_name: "",
         receiver_address: "",
         weight: "",
-        region_id: "",
       });
     } catch {
       setError("Failed to create package. Please try again.");
@@ -142,29 +125,6 @@ const NewPackage = () => {
                 onChange={(e) => setForm({ ...form, weight: e.target.value })}
                 required
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="region">Region</Label>
-
-              <Select
-                value={form.region_id}
-                onValueChange={(value) =>
-                  setForm({ ...form, region_id: value })
-                }
-              >
-                <SelectTrigger id="region">
-                  <SelectValue placeholder="Select Region" />
-                </SelectTrigger>
-
-                <SelectContent>
-                  {regions.map((region) => (
-                    <SelectItem key={region.id} value={String(region.id)}>
-                      {region.region_code} - {region.region_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             <Button type="submit" className="w-full">

@@ -7,7 +7,6 @@ export const getAllPackages = async (
 ): Promise<void> => {
   try {
     const packages = await prisma.package.findMany({
-      include: { region: true },
       orderBy: { created_at: "desc" },
     });
 
@@ -21,7 +20,7 @@ export const getAllPackages = async (
 
     res.json({ packages, dashboard });
   } catch (err) {
-    console.error(err);
+    console.error("err", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -34,7 +33,6 @@ export const getPackageByTrackingId = async (
     const trackingId = req.params.trackingId as string;
     const pkg = await prisma.package.findUnique({
       where: { tracking_id: trackingId },
-      include: { region: true },
     });
 
     if (!pkg) {
@@ -59,7 +57,6 @@ export const createPackage = async (
       receiver_name,
       receiver_address,
       weight,
-      region_id,
     } = req.body;
 
     const newPackage = await prisma.package.create({
@@ -69,7 +66,6 @@ export const createPackage = async (
         receiver_name,
         receiver_address,
         weight,
-        region_id: parseInt(region_id),
         status: "to_be_picked_up",
       },
     });
@@ -96,7 +92,6 @@ export const createPackage = async (
           receiver_name: newPackage.receiver_name,
           receiver_address: newPackage.receiver_address,
           weight: newPackage.weight,
-          region_id: newPackage.region_id,
         }),
       });
       console.log("Webhook sent to Stage 2 successfully");

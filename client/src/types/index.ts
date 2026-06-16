@@ -1,9 +1,3 @@
-export interface Region {
-  id: number;
-  region_code: string;
-  region_name: string;
-}
-
 export interface Package {
   id: number;
   tracking_id: string;
@@ -12,9 +6,6 @@ export interface Package {
   receiver_name: string;
   receiver_address: string;
   weight: number;
-  region_id: number;
-  region_code: string;
-  region_name: string;
   status: PackageStatus;
   current_location: string | null;
   delay_reason: string | null;
@@ -43,5 +34,4 @@ export interface CreatePackagePayload {
   receiver_name: string;
   receiver_address: string;
   weight: number;
-  region_id: number;
 }

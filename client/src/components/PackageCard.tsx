@@ -71,11 +71,6 @@ const PackageCard = ({ pkg }: Props) => {
             Weight:
             <strong className="ml-1">{pkg.weight} kg</strong>
           </span>
-
-          <span>
-            Region:
-            <strong className="ml-1">{pkg.region_code}</strong>
-          </span>
         </div>
 
         {pkg.delay_reason && (
