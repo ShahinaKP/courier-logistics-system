@@ -37,30 +37,6 @@ export const updateBagStatus = (
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   }).then((r) => r.json());
-// export const fetchTrucks = () =>
-//   fetch(`${BASE_URL}/trucks`).then((r) => r.json());
-// export const fetchSchedules = () =>
-//   fetch(`${BASE_URL}/trucks/schedules`).then((r) => r.json());
-// export const createSchedule = (data: {
-//   truck_id: number;
-//   region_id: number;
-//   scheduled_departure: string;
-// }) =>
-//   fetch(`${BASE_URL}/trucks/schedules`, {
-//     method: "POST",
-//     headers: { "Content-Type": "application/json" },
-//     body: JSON.stringify(data),
-//   }).then((r) => r.json());
-
-// export const updateSchedule = (
-//   scheduleId: number,
-//   data: { status: string; delay_reason?: string; actual_departure?: string },
-// ) =>
-//   fetch(`${BASE_URL}/trucks/schedules/${scheduleId}`, {
-//     method: "PATCH",
-//     headers: { "Content-Type": "application/json" },
-//     body: JSON.stringify(data),
-//   }).then((r) => r.json());
 
 export const fetchRegions = () =>
   fetch(`${BASE_URL}/regions`).then((r) => r.json());

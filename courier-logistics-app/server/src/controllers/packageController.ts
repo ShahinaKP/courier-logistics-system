@@ -7,7 +7,6 @@ export const getAllPackages = async (
 ): Promise<void> => {
   try {
     const packages = await prisma.package.findMany({
-      include: { region: true },
       orderBy: { created_at: "desc" },
     });
 
@@ -21,13 +20,19 @@ export const getAllPackages = async (
     res.json({
       packages,
       dashboard: {
+        // Recent unbagged packages — arrived in this pickup window
         new_in_window: packages.filter(
           (p) =>
-            p.status === "to_be_picked_up" &&
+            ["to_be_picked_up", "picked_up"].includes(p.status) &&
             p.created_at !== null &&
             p.created_at >= currentWindowStart,
         ),
-        unbagged: packages.filter((p) => p.status === "picked_up"),
+        // Older unbagged packages — arrived before current window
+        unbagged: packages.filter(
+          (p) =>
+            ["to_be_picked_up", "picked_up"].includes(p.status) &&
+            (p.created_at === null || p.created_at < currentWindowStart),
+        ),
         bagged: packages.filter((p) => p.status === "added_to_bag"),
         delayed: packages.filter((p) => p.delay_reason !== null),
       },
@@ -50,7 +55,6 @@ export const webhookCreatePackage = async (
       receiver_name,
       receiver_address,
       weight,
-      region_id,
     } = req.body;
     if (!tracking_id) {
       res.status(400).json({ error: "tracking_id is required" });
@@ -75,7 +79,6 @@ export const webhookCreatePackage = async (
         receiver_name,
         receiver_address,
         weight,
-        region_id: region_id ? parseInt(region_id) : null,
         status: "to_be_picked_up",
       },
     });
@@ -100,7 +103,6 @@ export const createPackage = async (
       receiver_name,
       receiver_address,
       weight,
-      region_id,
     } = req.body;
 
     const pkg = await prisma.package.create({
@@ -111,7 +113,6 @@ export const createPackage = async (
         receiver_name,
         receiver_address,
         weight,
-        region_id: parseInt(region_id),
         status: "to_be_picked_up",
       },
     });

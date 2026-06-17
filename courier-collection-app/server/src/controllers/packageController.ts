@@ -1,12 +1,13 @@
 import { Request, Response } from "express";
 import prisma from "../db/prisma";
+import type { Package } from "@prisma/client";
 
 export const getAllPackages = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
   try {
-    const packages = await prisma.package.findMany({
+    const packages: Package[] = await prisma.package.findMany({
       orderBy: { created_at: "desc" },
     });
 

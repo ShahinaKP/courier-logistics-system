@@ -14,7 +14,6 @@ model Region {
   region_name     String          @db.VarChar(100)
   created_at      DateTime?       @default(now()) @db.Timestamp(6)
   bags            Bag[]
-  packages        Package[]
   truck_schedules TruckSchedule[]
 
   @@map("regions")
@@ -28,14 +27,12 @@ model Package {
   receiver_name    String         @db.VarChar(100)
   receiver_address String
   weight           Decimal        @db.Decimal(10, 2)
-  region_id        Int?
   status           package_status @default(to_be_picked_up)
   current_location String?
   delay_reason     String?
   created_at       DateTime?      @default(now()) @db.Timestamp(6)
   updated_at       DateTime?      @default(now()) @db.Timestamp(6)
   package_bags     PackageBag[]
-  region           Region?        @relation(fields: [region_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@map("packages")
 }

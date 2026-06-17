@@ -6,9 +6,6 @@ export interface Package {
   receiver_name: string;
   receiver_address: string;
   weight: number;
-  region_id: number;
-  region_code: string;
-  region_name: string;
   status: string;
   current_location: string | null;
   delay_reason: string | null;

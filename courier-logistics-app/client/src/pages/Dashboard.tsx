@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import {
   Package2,
@@ -52,7 +51,6 @@ const PackageTable = ({ packages }: { packages: Package[] }) =>
               "Sender",
               "Receiver",
               "Weight",
-              "Region",
               "Status",
               "Delay",
             ].map((h) => (
@@ -71,11 +69,6 @@ const PackageTable = ({ packages }: { packages: Package[] }) =>
               <td className="px-4 py-3 font-medium">{p.sender_name}</td>
               <td className="px-4 py-3">{p.receiver_name}</td>
               <td className="px-4 py-3">{p.weight} kg</td>
-              <td className="px-4 py-3">
-                <Badge variant="secondary">
-                  {(p as any).region?.region_code ?? "—"}
-                </Badge>
-              </td>
               <td className="px-4 py-3">
                 <span
                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusVariant[p.status] || "bg-slate-100 text-slate-700"}`}
@@ -224,7 +217,7 @@ const Dashboard = () => {
         icon={<Inbox className="h-4 w-4 text-indigo-500" />}
       />
       <Section
-        title="Unbagged Packages (Picked Up)"
+        title="Unbagged Packages ( Awaiting bag assignment )"
         packages={dashboard.unbagged}
         icon={<Package2 className="h-4 w-4 text-amber-500" />}
       />

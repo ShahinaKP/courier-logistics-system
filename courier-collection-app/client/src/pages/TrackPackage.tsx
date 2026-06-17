@@ -182,13 +182,6 @@ const TrackPackage = () => {
                       {pkg.current_location || "Not updated yet"}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Region</p>
-                    <p className="font-medium">
-                      {(pkg as any).region?.region_code} –{" "}
-                      {(pkg as any).region?.region_name}
-                    </p>
-                  </div>
                   {pkg.delay_reason && (
                     <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-600">
                       <strong>Delay:</strong> {pkg.delay_reason}
