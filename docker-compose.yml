@@ -1,0 +1,131 @@
+version: "3.8"
+
+services:
+  # ── Collection DB ─────────────────────────────────────────────────────────
+  collection_db:
+    image: postgres:16-alpine
+    container_name: collection_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: courier_collection
+    ports:
+      - "5432:5432"
+    volumes:
+      - collection_pgdata:/var/lib/postgresql/data
+      - ./courier-collection-app/server/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - courier_network
+
+  # ── Collection Server ─────────────────────────────────────────────────────
+  collection_server:
+    build:
+      context: ./courier-collection-app/server
+      dockerfile: Dockerfile
+    container_name: collection_server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:password@collection_db:5432/courier_collection
+      JWT_SECRET: courier_secret_key_change_in_production
+      PORT: 5000
+      LOGISTICS_APP_URL: http://logistics_server:5001
+    ports:
+      - "5000:5000"
+    depends_on:
+      - collection_db
+    command: >
+      sh -c "
+        echo 'Waiting for collection DB...' &&
+        until nc -z collection_db 5432; do sleep 1; done &&
+        echo 'Collection DB ready.' &&
+        npx prisma db push --skip-generate &&
+        npx prisma db seed &&
+        node dist/index.js
+      "
+    networks:
+      - courier_network
+
+  # ── Collection Client ─────────────────────────────────────────────────────
+  collection_client:
+    build:
+      context: ./courier-collection-app/client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000/api
+    container_name: collection_client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - collection_server
+    networks:
+      - courier_network
+
+  # ── Logistics DB ──────────────────────────────────────────────────────────
+  logistics_db:
+    image: postgres:16-alpine
+    container_name: logistics_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: courier_logistics
+    ports:
+      - "5433:5432"
+    volumes:
+      - logistics_pgdata:/var/lib/postgresql/data
+      - ./courier-logistics-app/server/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - courier_network
+
+  # ── Logistics Server ──────────────────────────────────────────────────────
+  logistics_server:
+    build:
+      context: ./courier-logistics-app/server
+      dockerfile: Dockerfile
+    container_name: logistics_server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@logistics_db:5432/courier_logistics
+      PORT: 5001
+      COLLECTION_APP_URL: http://collection_server:5000
+    ports:
+      - "5001:5001"
+    depends_on:
+      - logistics_db
+    command: >
+      sh -c "
+        echo 'Waiting for logistics DB...' &&
+        until nc -z logistics_db 5432; do sleep 1; done &&
+        echo 'Logistics DB ready.' &&
+        npx prisma db push --skip-generate &&
+        npx prisma db seed &&
+        node dist/index.js
+      "
+    networks:
+      - courier_network
+
+  # ── Logistics Client ──────────────────────────────────────────────────────
+  logistics_client:
+    build:
+      context: ./courier-logistics-app/client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5001/api
+    container_name: logistics_client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - logistics_server
+    networks:
+      - courier_network
+
+networks:
+  courier_network:
+    driver: bridge
+
+volumes:
+  collection_pgdata:
+  logistics_pgdata:

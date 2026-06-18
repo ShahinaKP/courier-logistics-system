@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: logistics_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: courier_logistics
+    ports:
+      - "5433:5432"
+    volumes:
+      - logistics_pgdata:/var/lib/postgresql/data
+      - ./server/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: logistics_server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/courier_logistics
+      PORT: 5001
+      COLLECTION_APP_URL: http://collection_server:5000
+    ports:
+      - "5001:5001"
+    depends_on:
+      - db
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        until nc -z db 5432; do sleep 1; done &&
+        echo 'Database ready.' &&
+        npx prisma db push --skip-generate &&
+        npx prisma db seed &&
+        node dist/index.js
+      "
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5001/api
+    container_name: logistics_client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - server
+
+volumes:
+  logistics_pgdata:

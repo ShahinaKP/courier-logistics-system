@@ -1,22 +1,9 @@
 version: "3.8"
 
 services:
-  app:
-    image: node:20
-    container_name: courier_collection_app
-    working_dir: /workspace
-    volumes:
-      - .:/workspace
-    ports:
-      - "5000:5000"
-      - "3000:3000"
-    depends_on:
-      - db
-    command: sleep infinity
-
   db:
-    image: postgres:16
-    container_name: courier_collection_db
+    image: postgres:16-alpine
+    container_name: collection_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -25,8 +12,46 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - collection_pgdata:/var/lib/postgresql/data
       - ./server/db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: collection_server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:password@db:5432/courier_collection
+      JWT_SECRET: courier_secret_key_change_in_production
+      PORT: 5000
+      LOGISTICS_APP_URL: http://logistics_server:5001
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+    command: >
+      sh -c "
+        echo 'Waiting for database...' &&
+        until nc -z db 5432; do sleep 1; done &&
+        echo 'Database ready.' &&
+        npx prisma db push --skip-generate &&
+        npx prisma db seed &&
+        node dist/index.js
+      "
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000/api
+    container_name: collection_client
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - server
+
 volumes:
-  pgdata:
+  collection_pgdata:
