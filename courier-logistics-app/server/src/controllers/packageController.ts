@@ -7,6 +7,10 @@ export const getAllPackages = async (
 ): Promise<void> => {
   try {
     const packages = await prisma.package.findMany({
+      include: {
+        destination_region: true,
+        current_region: true,
+      },
       orderBy: { created_at: "desc" },
     });
 
@@ -20,14 +24,12 @@ export const getAllPackages = async (
     res.json({
       packages,
       dashboard: {
-        // Recent unbagged packages — arrived in this pickup window
         new_in_window: packages.filter(
           (p) =>
             ["to_be_picked_up", "picked_up"].includes(p.status) &&
             p.created_at !== null &&
             p.created_at >= currentWindowStart,
         ),
-        // Older unbagged packages — arrived before current window
         unbagged: packages.filter(
           (p) =>
             ["to_be_picked_up", "picked_up"].includes(p.status) &&
@@ -52,10 +54,14 @@ export const webhookCreatePackage = async (
       tracking_id,
       sender_name,
       sender_address,
+      sender_pincode,
       receiver_name,
       receiver_address,
+      receiver_pincode,
+      destination_region_id,
       weight,
     } = req.body;
+
     if (!tracking_id) {
       res.status(400).json({ error: "tracking_id is required" });
       return;
@@ -76,12 +82,18 @@ export const webhookCreatePackage = async (
         tracking_id,
         sender_name,
         sender_address,
+        sender_pincode: sender_pincode ?? null,
         receiver_name,
         receiver_address,
-        weight,
+        receiver_pincode: receiver_pincode ?? null,
+        destination_region_id: destination_region_id
+          ? parseInt(destination_region_id)
+          : null,
         status: "to_be_picked_up",
+        weight,
       },
     });
+
     res
       .status(201)
       .json({ message: "Package received via webhook", package: pkg });
@@ -100,8 +112,11 @@ export const createPackage = async (
       tracking_id,
       sender_name,
       sender_address,
+      sender_pincode,
       receiver_name,
       receiver_address,
+      receiver_pincode,
+      destination_region_id,
       weight,
     } = req.body;
 
@@ -110,8 +125,13 @@ export const createPackage = async (
         tracking_id,
         sender_name,
         sender_address,
+        sender_pincode: sender_pincode ?? null,
         receiver_name,
         receiver_address,
+        receiver_pincode: receiver_pincode ?? null,
+        destination_region_id: destination_region_id
+          ? parseInt(destination_region_id)
+          : null,
         weight,
         status: "to_be_picked_up",
       },
@@ -130,11 +150,20 @@ export const updatePackageStatus = async (
 ): Promise<void> => {
   try {
     const trackingId = req.params.trackingId as string;
-    const { status, current_location, delay_reason } = req.body;
+    const { status, current_location, current_region_id, delay_reason } =
+      req.body;
 
     const pkg = await prisma.package.update({
       where: { tracking_id: trackingId },
-      data: { status, current_location, delay_reason, updated_at: new Date() },
+      data: {
+        status,
+        current_location: current_location ?? undefined,
+        current_region_id: current_region_id
+          ? parseInt(current_region_id)
+          : undefined,
+        delay_reason: delay_reason ?? null,
+        updated_at: new Date(),
+      },
     });
 
     res.json(pkg);

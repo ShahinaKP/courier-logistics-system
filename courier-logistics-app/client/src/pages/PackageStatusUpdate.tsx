@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { ClipboardEdit } from "lucide-react";
+import { ClipboardEdit, AlertTriangle } from "lucide-react";
 
 const STATUSES = [
   { value: "to_be_picked_up", label: "To Be Picked Up" },
@@ -96,6 +96,13 @@ const PackageStatusUpdate = () => {
       p.receiver_name.toLowerCase().includes(search.toLowerCase()),
   );
 
+  // Delayed packages first, then by status
+  const sorted = [...filtered].sort((a, b) => {
+    if (a.delay_reason && !b.delay_reason) return -1;
+    if (!a.delay_reason && b.delay_reason) return 1;
+    return 0;
+  });
+
   return (
     <div className="container mx-auto space-y-6 p-6">
       <div>
@@ -110,9 +117,18 @@ const PackageStatusUpdate = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ClipboardEdit className="h-4 w-4" />
-            All Packages
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <ClipboardEdit className="h-4 w-4" />
+              All Packages
+            </span>
+            {/* Delayed count badge */}
+            {packages.filter((p) => p.delay_reason).length > 0 && (
+              <span className="flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                <AlertTriangle className="h-3 w-3" />
+                {packages.filter((p) => p.delay_reason).length} delayed
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -122,104 +138,151 @@ const PackageStatusUpdate = () => {
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          {filtered.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
               No packages found.
             </div>
           ) : (
             <div className="space-y-2">
-              {filtered.map((p) => (
-                <div key={p.id} className="rounded-lg border">
-                  <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-                    <span className="font-mono text-xs text-muted-foreground w-28">
-                      {p.tracking_id.slice(0, 8)}…
-                    </span>
-                    <span className="font-medium text-sm flex-1 min-w-[120px]">
-                      {p.sender_name} → {p.receiver_name}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {p.weight} kg
-                    </span>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        statusVariant[p.status] || "bg-slate-100 text-slate-700"
-                      }`}
+              {sorted.map((p) => {
+                const isDelayed = !!p.delay_reason;
+                return (
+                  <div
+                    key={p.id}
+                    className={`rounded-lg border overflow-hidden ${isDelayed ? "border-red-200" : ""}`}
+                  >
+                    {/* Package row */}
+                    <div
+                      className={`flex flex-wrap items-center gap-3 px-4 py-3 ${isDelayed ? "bg-red-50/40" : ""}`}
                     >
-                      {STATUSES.find((s) => s.value === p.status)?.label ??
-                        p.status}
-                    </span>
-                    {p.current_location && (
-                      <Badge variant="outline" className="text-xs">
-                        📍 {p.current_location}
-                      </Badge>
-                    )}
-                    {successId === p.tracking_id && (
-                      <span className="text-xs text-green-600 font-medium">
-                        ✓ Saved
+                      <span className="w-28 font-mono text-xs text-muted-foreground">
+                        {p.tracking_id.slice(0, 8)}…
                       </span>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        editingId === p.tracking_id
-                          ? cancelEdit()
-                          : startEdit(p)
-                      }
-                    >
-                      {editingId === p.tracking_id ? "Cancel" : "Edit"}
-                    </Button>
-                  </div>
+                      <span className="flex-1 min-w-[120px] text-sm font-medium">
+                        {p.sender_name} → {p.receiver_name}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {p.weight} kg
+                      </span>
 
-                  {/* Edit form */}
-                  {editingId === p.tracking_id && (
-                    <div className="border-t bg-muted/20 px-6 py-4 grid gap-4 md:grid-cols-3">
-                      <div className="space-y-2">
-                        <Label className="text-xs">New Status</Label>
-                        <Select value={newStatus} onValueChange={setNewStatus}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUSES.map((s) => (
-                              <SelectItem key={s.value} value={s.value}>
-                                {s.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">Current Location</Label>
-                        <Input
-                          placeholder="e.g. Region HUB-NORTH"
-                          value={newLocation}
-                          onChange={(e) => setNewLocation(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-xs">
-                          Delay Reason (leave blank to clear)
-                        </Label>
-                        <Input
-                          placeholder="e.g. Weather conditions"
-                          value={delayReason}
-                          onChange={(e) => setDelayReason(e.target.value)}
-                        />
-                      </div>
-                      <div className="md:col-span-3 flex justify-end">
-                        <Button
-                          size="sm"
-                          onClick={() => saveEdit(p.tracking_id)}
-                          disabled={saving}
-                        >
-                          {saving ? "Saving…" : "Save Changes"}
-                        </Button>
-                      </div>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusVariant[p.status] ?? "bg-slate-100 text-slate-700"}`}
+                      >
+                        {STATUSES.find((s) => s.value === p.status)?.label ??
+                          p.status}
+                      </span>
+
+                      {p.current_location && (
+                        <Badge variant="outline" className="text-xs">
+                          📍 {p.current_location}
+                        </Badge>
+                      )}
+
+                      {successId === p.tracking_id && (
+                        <span className="text-xs font-medium text-green-600">
+                          ✓ Saved
+                        </span>
+                      )}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          editingId === p.tracking_id
+                            ? cancelEdit()
+                            : startEdit(p)
+                        }
+                      >
+                        {editingId === p.tracking_id ? "Cancel" : "Edit"}
+                      </Button>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Delay reason banner — always visible when delayed */}
+                    {isDelayed && (
+                      <div className="flex items-start gap-2 border-t border-red-200 bg-red-50 px-4 py-2 text-xs text-red-700">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <div>
+                          <span className="font-semibold">Delayed:</span>{" "}
+                          {p.delay_reason}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Edit form */}
+                    {editingId === p.tracking_id && (
+                      <div className="border-t bg-muted/20 px-6 py-4 grid gap-4 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs">New Status</Label>
+                          <Select
+                            value={newStatus}
+                            onValueChange={setNewStatus}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUSES.map((s) => (
+                                <SelectItem key={s.value} value={s.value}>
+                                  {s.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Current Location</Label>
+                          <Input
+                            placeholder="e.g. RG-N Hub"
+                            value={newLocation}
+                            onChange={(e) => setNewLocation(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">
+                            Delay Reason
+                            <span className="ml-1 font-normal text-muted-foreground">
+                              (leave blank to clear)
+                            </span>
+                          </Label>
+                          <Input
+                            placeholder="e.g. Weather conditions"
+                            value={delayReason}
+                            onChange={(e) => setDelayReason(e.target.value)}
+                            className={
+                              delayReason
+                                ? "border-red-300 focus-visible:ring-red-300"
+                                : ""
+                            }
+                          />
+                        </div>
+                        <div className="md:col-span-3 flex items-center justify-between">
+                          {delayReason && (
+                            <span className="flex items-center gap-1 text-xs text-red-600">
+                              <AlertTriangle className="h-3 w-3" />
+                              Saving with a delay reason will mark this package
+                              as delayed
+                            </span>
+                          )}
+                          {!delayReason && isDelayed && (
+                            <span className="text-xs text-green-600">
+                              Leaving delay reason blank will clear the delay
+                            </span>
+                          )}
+                          <div className="ml-auto">
+                            <Button
+                              size="sm"
+                              onClick={() => saveEdit(p.tracking_id)}
+                              disabled={saving}
+                            >
+                              {saving ? "Saving…" : "Save Changes"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>

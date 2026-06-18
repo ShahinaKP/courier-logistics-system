@@ -27,12 +27,14 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
+import { ConfirmDialog, DelayModal } from "../components/Dialog";
 import {
   Truck as TruckIcon,
   PackageOpen,
   Plus,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 
 const scheduleStatusColor: Record<string, string> = {
@@ -52,18 +54,38 @@ const TruckSchedules = () => {
   >([]);
   const [expandedSchedule, setExpandedSchedule] = useState<number | null>(null);
 
-  // Create truck form
   const [truckCode, setTruckCode] = useState("");
   const [truckCapacity, setTruckCapacity] = useState("10");
-
-  // Create schedule form
   const [selectedTruck, setSelectedTruck] = useState("");
   const [scheduleRegion, setScheduleRegion] = useState("");
   const [departure, setDeparture] = useState("");
-
-  // Load bag form
   const [loadScheduleId, setLoadScheduleId] = useState("");
   const [loadBagId, setLoadBagId] = useState("");
+
+  const [departConfirm, setDepartConfirm] = useState<{
+    open: boolean;
+    scheduleId: number | null;
+    truckCode: string;
+  }>({ open: false, scheduleId: null, truckCode: "" });
+  const [arrivedConfirm, setArrivedConfirm] = useState<{
+    open: boolean;
+    scheduleId: number | null;
+    truckCode: string;
+  }>({ open: false, scheduleId: null, truckCode: "" });
+  const [delayModal, setDelayModal] = useState<{
+    open: boolean;
+    scheduleId: number | null;
+  }>({ open: false, scheduleId: null });
+  const [rescheduleConfirm, setRescheduleConfirm] = useState<{
+    open: boolean;
+    scheduleId: number | null;
+    truckCode: string;
+  }>({ open: false, scheduleId: null, truckCode: "" });
+  const [modalLoading, setModalLoading] = useState(false);
+  const [actionMsg, setActionMsg] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
 
   const load = () => {
     fetchTrucks().then(setTrucks);
@@ -85,7 +107,7 @@ const TruckSchedules = () => {
       capacity: parseInt(truckCapacity),
     });
     if (result.error) {
-      alert(result.error);
+      setActionMsg({ ok: false, text: result.error });
       return;
     }
     setTruckCode("");
@@ -113,33 +135,101 @@ const TruckSchedules = () => {
       parseInt(loadBagId),
     );
     if (result.error) {
-      alert(result.error);
+      setActionMsg({ ok: false, text: result.error });
       return;
     }
     setLoadBagId("");
     load();
   };
 
-  const handleDelay = async (scheduleId: number) => {
-    const reason = prompt("Enter delay reason:");
-    if (!reason) return;
-    await updateSchedule(scheduleId, {
-      status: "delayed",
-      delay_reason: reason,
-    });
-    load();
-  };
-
-  const handleDepart = async (scheduleId: number) => {
-    await updateSchedule(scheduleId, {
+  const confirmDepart = async () => {
+    if (!departConfirm.scheduleId) return;
+    setModalLoading(true);
+    await updateSchedule(departConfirm.scheduleId, {
       status: "departed",
       actual_departure: new Date().toISOString(),
     });
+    setModalLoading(false);
+    setDepartConfirm({ open: false, scheduleId: null, truckCode: "" });
+    load();
+  };
+
+  const confirmArrived = async () => {
+    if (!arrivedConfirm.scheduleId) return;
+    setModalLoading(true);
+    await updateSchedule(arrivedConfirm.scheduleId, { status: "arrived" });
+    setModalLoading(false);
+    setArrivedConfirm({ open: false, scheduleId: null, truckCode: "" });
+    load();
+  };
+
+  const confirmDelay = async (reason: string) => {
+    if (!delayModal.scheduleId) return;
+    setModalLoading(true);
+    await updateSchedule(delayModal.scheduleId, {
+      status: "delayed",
+      delay_reason: reason,
+    });
+    setModalLoading(false);
+    setDelayModal({ open: false, scheduleId: null });
+    load();
+  };
+
+  const confirmReschedule = async () => {
+    if (!rescheduleConfirm.scheduleId) return;
+    setModalLoading(true);
+    await updateSchedule(rescheduleConfirm.scheduleId, {
+      status: "scheduled",
+      delay_reason: "",
+    });
+    setModalLoading(false);
+    setRescheduleConfirm({ open: false, scheduleId: null, truckCode: "" });
     load();
   };
 
   return (
     <div className="container mx-auto space-y-6 p-6">
+      <ConfirmDialog
+        open={departConfirm.open}
+        onClose={() =>
+          setDepartConfirm({ open: false, scheduleId: null, truckCode: "" })
+        }
+        onConfirm={confirmDepart}
+        title={`Mark ${departConfirm.truckCode} as Departed?`}
+        description="The truck will be marked as departed and all packages on board will move to En Route. This cannot be undone."
+        confirmLabel="Mark Departed"
+        loading={modalLoading}
+      />
+      <ConfirmDialog
+        open={arrivedConfirm.open}
+        onClose={() =>
+          setArrivedConfirm({ open: false, scheduleId: null, truckCode: "" })
+        }
+        onConfirm={confirmArrived}
+        title={`Mark ${arrivedConfirm.truckCode} as Arrived?`}
+        description="Confirm the truck has arrived at its destination. Package statuses will be updated to Arrived."
+        confirmLabel="Mark Arrived"
+        loading={modalLoading}
+      />
+      <ConfirmDialog
+        open={rescheduleConfirm.open}
+        onClose={() =>
+          setRescheduleConfirm({ open: false, scheduleId: null, truckCode: "" })
+        }
+        onConfirm={confirmReschedule}
+        title={`Reschedule ${rescheduleConfirm.truckCode}?`}
+        description="This will clear the delay and move the schedule back to Scheduled. The delay reason will be removed from all packages on board."
+        confirmLabel="Reschedule"
+        loading={modalLoading}
+      />
+      <DelayModal
+        open={delayModal.open}
+        onClose={() => setDelayModal({ open: false, scheduleId: null })}
+        onConfirm={confirmDelay}
+        title="Delay This Truck Schedule"
+        loading={modalLoading}
+      />
+
       <div>
         <h1 className="text-4xl font-bold tracking-tight">Truck Schedules</h1>
         <p className="mt-2 text-muted-foreground">
@@ -147,8 +237,21 @@ const TruckSchedules = () => {
         </p>
       </div>
 
+      {actionMsg && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm ${actionMsg.ok ? "border-green-200 bg-green-50 text-green-700" : "border-red-200 bg-red-50 text-red-700"}`}
+        >
+          {actionMsg.text}
+          <button
+            className="ml-3 text-xs underline"
+            onClick={() => setActionMsg(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Create Truck */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -184,7 +287,6 @@ const TruckSchedules = () => {
           </CardContent>
         </Card>
 
-        {/* Create Schedule */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -241,7 +343,6 @@ const TruckSchedules = () => {
           </CardContent>
         </Card>
 
-        {/* Load Bag onto Truck */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -295,7 +396,6 @@ const TruckSchedules = () => {
         </Card>
       </div>
 
-      {/* Schedules list */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between text-base">
@@ -313,7 +413,7 @@ const TruckSchedules = () => {
           ) : (
             <div className="space-y-2">
               {schedules.map((s) => (
-                <div key={s.id} className="rounded-lg border">
+                <div key={s.id} className="rounded-lg border overflow-hidden">
                   <div className="flex flex-wrap items-center gap-3 px-4 py-3">
                     <button
                       className="text-muted-foreground hover:text-foreground"
@@ -329,14 +429,13 @@ const TruckSchedules = () => {
                         <ChevronRight className="h-4 w-4" />
                       )}
                     </button>
-
-                    <span className="font-mono text-sm font-semibold w-24">
+                    <span className="w-24 font-mono text-sm font-semibold">
                       {(s as any).truck?.truck_code ?? `SCH-${s.id}`}
                     </span>
                     <Badge variant="secondary" className="w-20 justify-center">
                       {(s as any).region?.region_code ?? "—"}
                     </Badge>
-                    <span className="text-sm text-muted-foreground flex-1">
+                    <span className="flex-1 text-sm text-muted-foreground">
                       {new Date(s.scheduled_departure).toLocaleString()}
                     </span>
                     <span className="text-xs text-muted-foreground">
@@ -344,10 +443,7 @@ const TruckSchedules = () => {
                       {(s as any).package_count ?? 0} pkgs
                     </span>
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        scheduleStatusColor[s.status] ||
-                        "bg-slate-100 text-slate-700"
-                      }`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${scheduleStatusColor[s.status] ?? "bg-slate-100 text-slate-700"}`}
                     >
                       {s.status}
                     </span>
@@ -358,33 +454,78 @@ const TruckSchedules = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleDepart(s.id)}
+                            onClick={() =>
+                              setDepartConfirm({
+                                open: true,
+                                scheduleId: s.id,
+                                truckCode:
+                                  (s as any).truck?.truck_code ?? `SCH-${s.id}`,
+                              })
+                            }
                           >
                             Mark Departed
                           </Button>
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handleDelay(s.id)}
+                            onClick={() =>
+                              setDelayModal({ open: true, scheduleId: s.id })
+                            }
                           >
                             Delay
                           </Button>
                         </>
                       )}
+                      {s.status === "delayed" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setRescheduleConfirm({
+                              open: true,
+                              scheduleId: s.id,
+                              truckCode:
+                                (s as any).truck?.truck_code ?? `SCH-${s.id}`,
+                            })
+                          }
+                        >
+                          Reschedule
+                        </Button>
+                      )}
+                      {s.status === "departed" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setArrivedConfirm({
+                              open: true,
+                              scheduleId: s.id,
+                              truckCode:
+                                (s as any).truck?.truck_code ?? `SCH-${s.id}`,
+                            })
+                          }
+                        >
+                          Mark Arrived
+                        </Button>
+                      )}
                     </div>
                   </div>
 
-                  {/* Expanded: bags on this schedule */}
+                  {/* Delay reason banner */}
+                  {s.status === "delayed" && s.delay_reason && (
+                    <div className="flex items-center gap-2 border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      <span>
+                        <strong>Delay reason:</strong> {s.delay_reason}
+                      </span>
+                    </div>
+                  )}
+
                   {expandedSchedule === s.id && (
                     <div className="border-t bg-muted/20 px-8 py-3 text-xs text-muted-foreground">
-                      {s.delay_reason && (
-                        <p className="mb-2 text-red-600">
-                          <strong>Delay:</strong> {s.delay_reason}
-                        </p>
-                      )}
                       {(s as any).truck_bags?.length > 0 ? (
                         <div className="space-y-1">
-                          <p className="font-medium text-foreground mb-1">
+                          <p className="mb-1 font-medium text-foreground">
                             Loaded bags:
                           </p>
                           {(s as any).truck_bags.map((tb: any) => (
@@ -416,7 +557,6 @@ const TruckSchedules = () => {
         </CardContent>
       </Card>
 
-      {/* Fleet overview */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">

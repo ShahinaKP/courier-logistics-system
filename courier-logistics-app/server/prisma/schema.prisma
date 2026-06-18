@@ -9,30 +9,49 @@ datasource db {
 }
 
 model Region {
-  id              Int             @id @default(autoincrement())
-  region_code     String          @unique @db.VarChar(10)
-  region_name     String          @db.VarChar(100)
-  created_at      DateTime?       @default(now()) @db.Timestamp(6)
-  bags            Bag[]
-  truck_schedules TruckSchedule[]
+  id                   Int             @id @default(autoincrement())
+  region_code          String          @unique @db.VarChar(10)
+  region_name          String          @db.VarChar(100)
+  created_at           DateTime?       @default(now()) @db.Timestamp(6)
+  bags                 Bag[]
+  truck_schedules      TruckSchedule[]
+  pincodes             Pincode[]
+  destination_packages Package[]       @relation("destination")
+  current_packages     Package[]       @relation("current")
 
   @@map("regions")
 }
 
+model Pincode {
+  id        Int    @id @default(autoincrement())
+  pincode   String @unique @db.VarChar(10)
+  city      String @db.VarChar(100)
+  region_id Int
+  region    Region @relation(fields: [region_id], references: [id])
+
+  @@map("pincodes")
+}
+
 model Package {
-  id               Int            @id @default(autoincrement())
-  tracking_id      String         @unique @db.Uuid
-  sender_name      String         @db.VarChar(100)
-  sender_address   String
-  receiver_name    String         @db.VarChar(100)
-  receiver_address String
-  weight           Decimal        @db.Decimal(10, 2)
-  status           package_status @default(to_be_picked_up)
-  current_location String?
-  delay_reason     String?
-  created_at       DateTime?      @default(now()) @db.Timestamp(6)
-  updated_at       DateTime?      @default(now()) @db.Timestamp(6)
-  package_bags     PackageBag[]
+  id                    Int            @id @default(autoincrement())
+  tracking_id           String         @unique @db.Uuid
+  sender_name           String         @db.VarChar(100)
+  sender_address        String
+  sender_pincode        String?        @db.VarChar(10)
+  receiver_name         String         @db.VarChar(100)
+  receiver_address      String
+  receiver_pincode      String?        @db.VarChar(10)
+  destination_region_id Int?
+  current_region_id     Int?
+  weight                Decimal        @db.Decimal(10, 2)
+  status                package_status @default(to_be_picked_up)
+  current_location      String?
+  delay_reason          String?
+  created_at            DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?      @default(now()) @db.Timestamp(6)
+  package_bags          PackageBag[]
+  destination_region    Region?        @relation("destination", fields: [destination_region_id], references: [id])
+  current_region        Region?        @relation("current", fields: [current_region_id], references: [id])
 
   @@map("packages")
 }

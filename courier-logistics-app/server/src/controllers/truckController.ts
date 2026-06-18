@@ -121,25 +121,52 @@ export const updateSchedule = async (
       },
     });
 
+    // Fetch package IDs once — used by all status transitions below
+    const truckBags = await prisma.truckBag.findMany({
+      where: { truck_schedule_id: scheduleId },
+      include: { bag: { include: { package_bags: true } } },
+    });
+
+    const packageIds = truckBags.flatMap(
+      (tb) =>
+        tb.bag?.package_bags.map((pb) => pb.package_id!).filter(Boolean) ?? [],
+    );
+
     // If status is "departed", update all bags in this schedule to en_route
-    if (status === "departed") {
-      const truckBags = await prisma.truckBag.findMany({
-        where: { truck_schedule_id: scheduleId },
-        include: { bag: { include: { package_bags: true } } },
+    if (status === "departed" && packageIds.length > 0) {
+      await prisma.package.updateMany({
+        where: { id: { in: packageIds } },
+        data: {
+          status: "en_route",
+          delay_reason: null,
+          updated_at: new Date(),
+        },
       });
+    }
 
-      const packageIds = truckBags.flatMap(
-        (tb) =>
-          tb.bag?.package_bags.map((pb) => pb.package_id!).filter(Boolean) ??
-          [],
-      );
+    if (status === "arrived" && packageIds.length > 0) {
+      await prisma.package.updateMany({
+        where: { id: { in: packageIds } },
+        data: { status: "arrived", delay_reason: null, updated_at: new Date() },
+      });
+    }
 
-      if (packageIds.length > 0) {
-        await prisma.package.updateMany({
-          where: { id: { in: packageIds } },
-          data: { status: "en_route", updated_at: new Date() },
-        });
-      }
+    if (status === "delayed" && delay_reason && packageIds.length > 0) {
+      await prisma.package.updateMany({
+        where: { id: { in: packageIds } },
+        data: {
+          delay_reason: `Truck delayed: ${delay_reason}`,
+          updated_at: new Date(),
+        },
+      });
+    }
+
+    if (status === "scheduled" && packageIds.length > 0) {
+      // Rescheduled after delay — clear delay reason on all packages
+      await prisma.package.updateMany({
+        where: { id: { in: packageIds } },
+        data: { delay_reason: null, updated_at: new Date() },
+      });
     }
 
     res.json(schedule);

@@ -1,5 +1,5 @@
 import { getToken } from "./authApi";
-import type { CreatePackagePayload, Package } from "../types";
+import type { CreatePackagePayload, Package, PincodeResult } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -29,4 +29,18 @@ export const createPackage = async (payload: CreatePackagePayload) => {
   });
   if (!res.ok) throw new Error("Failed to create package");
   return res.json();
+};
+
+// Pincode lookup — public, no auth needed
+export const lookupPincode = async (
+  pincode: string,
+): Promise<PincodeResult | null> => {
+  if (pincode.length !== 6) return null;
+  try {
+    const res = await fetch(`${BASE_URL}/pincodes/${pincode}`);
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 };

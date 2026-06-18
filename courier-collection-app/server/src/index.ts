@@ -7,6 +7,7 @@ import cors from "cors";
 import packageRoutes from "./routes/packageRoutes";
 import { processRawUpdates } from "./controllers/packageController";
 import authRoutes from "./routes/authRoutes";
+import pincodeRoutes from "./routes/pincodeRoutes";
 
 // Run ETL processor every 1 minute
 setInterval(processRawUpdates, 60 * 1000);
@@ -20,6 +21,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/packages", packageRoutes);
+app.use("/api/pincodes", pincodeRoutes);
 
 app.get("/health", (req, res) => {
   res.json({ status: "ok", message: "Courier Collection API is running" });

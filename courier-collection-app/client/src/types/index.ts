@@ -1,10 +1,28 @@
+export interface Region {
+  id: number;
+  region_code: string;
+  region_name: string;
+}
+
+export interface PincodeResult {
+  pincode: string;
+  city: string;
+  region_id: number;
+  region_code: string;
+  region_name: string;
+}
+
 export interface Package {
   id: number;
   tracking_id: string;
   sender_name: string;
   sender_address: string;
+  sender_pincode: string;
   receiver_name: string;
   receiver_address: string;
+  receiver_pincode: string;
+  destination_region_id: number | null;
+  destination_region: Region | null;
   weight: number;
   status: PackageStatus;
   current_location: string | null;
@@ -31,7 +49,9 @@ export interface Dashboard {
 export interface CreatePackagePayload {
   sender_name: string;
   sender_address: string;
+  sender_pincode: string;
   receiver_name: string;
   receiver_address: string;
+  receiver_pincode: string;
   weight: number;
 }

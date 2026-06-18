@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../db/prisma";
+import { getDirection } from "../utils/directionUtils";
 
 export const getAllBags = async (
   req: Request,
@@ -10,14 +11,17 @@ export const getAllBags = async (
       include: {
         region: true,
         package_bags: {
-          include: { package: true },
-        },
-        truck_bags: {
           include: {
-            truck_schedule: {
-              include: { truck: true },
+            package: {
+              include: {
+                destination_region: true,
+                current_region: true,
+              },
             },
           },
+        },
+        truck_bags: {
+          include: { truck_schedule: { include: { truck: true } } },
         },
       },
       orderBy: { created_at: "desc" },
@@ -69,7 +73,10 @@ export const addPackageToBag = async (
     const packageId = parseInt(req.body.package_id as string);
 
     // Validate bag exists and is open
-    const bag = await prisma.bag.findUnique({ where: { id: bagId } });
+    const bag = await prisma.bag.findUnique({
+      where: { id: bagId },
+      include: { region: true },
+    });
     if (!bag) {
       res.status(404).json({ error: "Bag not found" });
       return;
@@ -79,8 +86,11 @@ export const addPackageToBag = async (
       return;
     }
 
-    // Validate package exists and is in an eligible status
-    const pkg = await prisma.package.findUnique({ where: { id: packageId } });
+    // Validate package exists and is eligible
+    const pkg = await prisma.package.findUnique({
+      where: { id: packageId },
+      include: { destination_region: true },
+    });
     if (!pkg) {
       res.status(404).json({ error: "Package not found" });
       return;
@@ -89,12 +99,12 @@ export const addPackageToBag = async (
     const eligible = ["to_be_picked_up", "picked_up"];
     if (!eligible.includes(pkg.status)) {
       res.status(400).json({
-        error: `Package status "${pkg.status}" is not eligible for bagging. Must be "to_be_picked_up" or "picked_up".`,
+        error: `Package status "${pkg.status}" is not eligible for bagging.`,
       });
       return;
     }
 
-    // Check package is not already in a bag
+    // Check not already bagged
     const alreadyBagged = await prisma.packageBag.findFirst({
       where: { package_id: packageId },
     });
@@ -103,15 +113,31 @@ export const addPackageToBag = async (
       return;
     }
 
-    // Add to bag
+    // ── Direction validation ──────────────────────────────────────────────────
+    // Only validate if we know both the bag's hub region AND the package's
+    // destination region. If either is missing we allow it (edge case / legacy).
+    if (bag.region && pkg.destination_region) {
+      const expectedDirection = getDirection(
+        bag.region.region_code,
+        pkg.destination_region.region_code,
+      );
+
+      if (bag.direction !== expectedDirection) {
+        res.status(400).json({
+          error:
+            `Wrong bag direction. Package is going to ${pkg.destination_region.region_name} ` +
+            `(${pkg.destination_region.region_code}), so it should go "${expectedDirection}" ` +
+            `from ${bag.region.region_code}, but this bag goes "${bag.direction}".`,
+        });
+        return;
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     await prisma.packageBag.create({
       data: { package_id: packageId, bag_id: bagId },
     });
 
-    // Advance status:
-    // - "to_be_picked_up" packages are implicitly picked up when the hub bags them,
-    //   so we go straight to "added_to_bag".
-    // - "picked_up" packages also move to "added_to_bag".
     await prisma.package.update({
       where: { id: packageId },
       data: { status: "added_to_bag", updated_at: new Date() },
@@ -132,24 +158,21 @@ export const updateBagStatus = async (
     const bagId = parseInt(req.params.bagId as string);
     const { status, delay_reason } = req.body;
 
-    // ── Guard: cannot seal an empty bag ──────────────────────────────────────
     if (status === "sealed") {
       const count = await prisma.packageBag.count({ where: { bag_id: bagId } });
       if (count === 0) {
-        res
-          .status(400)
-          .json({
-            error: "Cannot seal an empty bag. Add at least one package first.",
-          });
+        res.status(400).json({
+          error: "Cannot seal an empty bag. Add at least one package first.",
+        });
         return;
       }
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     await prisma.bag.update({
       where: { id: bagId },
       data: { status, updated_at: new Date() },
     });
+
     const packageIds = (
       await prisma.packageBag.findMany({ where: { bag_id: bagId } })
     )
@@ -157,7 +180,6 @@ export const updateBagStatus = async (
       .filter(Boolean);
 
     if (status === "delayed" && delay_reason) {
-      // Propagate delay reason to all packages in the bag
       await prisma.package.updateMany({
         where: { id: { in: packageIds } },
         data: { delay_reason, updated_at: new Date() },
@@ -165,7 +187,6 @@ export const updateBagStatus = async (
     }
 
     if (status === "sealed" || status === "open") {
-      // Clear any delay reason when sealing or reopening
       await prisma.package.updateMany({
         where: { id: { in: packageIds } },
         data: { delay_reason: null, updated_at: new Date() },

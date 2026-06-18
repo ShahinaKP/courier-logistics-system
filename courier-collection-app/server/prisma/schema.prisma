@@ -6,21 +6,45 @@ datasource db {
   provider = "postgresql"
 }
 
+model Region {
+  id          Int       @id @default(autoincrement())
+  region_code String    @unique @db.VarChar(10)
+  region_name String    @db.VarChar(100)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  pincodes    Pincode[]
+  packages    Package[]
+
+  @@map("regions")
+}
+
+model Pincode {
+  id        Int    @id @default(autoincrement())
+  pincode   String @unique @db.VarChar(10)
+  city      String @db.VarChar(100)
+  region_id Int
+  region    Region @relation(fields: [region_id], references: [id])
+
+  @@map("pincodes")
+}
 
 model Package {
-  id               Int            @id @default(autoincrement())
-  tracking_id      String         @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  sender_name      String         @db.VarChar(100)
-  sender_address   String
-  receiver_name    String         @db.VarChar(100)
-  receiver_address String
-  weight           Decimal        @db.Decimal(10, 2)
-  status           package_status @default(to_be_picked_up)
-  current_location String?
-  delay_reason     String?
-  created_at       DateTime?      @default(now()) @db.Timestamp(6)
-  updated_at       DateTime?      @default(now()) @db.Timestamp(6)
-  sale             Sale[]
+  id                    Int            @id @default(autoincrement())
+  tracking_id           String         @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sender_name           String         @db.VarChar(100)
+  sender_address        String
+  sender_pincode        String         @db.VarChar(10)
+  receiver_name         String         @db.VarChar(100)
+  receiver_address      String
+  receiver_pincode      String         @db.VarChar(10)
+  destination_region_id Int?
+  weight                Decimal        @db.Decimal(10, 2)
+  status                package_status @default(to_be_picked_up)
+  current_location      String?
+  delay_reason          String?
+  created_at            DateTime?      @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?      @default(now()) @db.Timestamp(6)
+  destination_region    Region?        @relation(fields: [destination_region_id], references: [id])
+  sale                  Sale[]
 
   @@map("packages")
 }
