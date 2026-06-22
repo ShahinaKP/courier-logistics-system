@@ -33,7 +33,7 @@ import {
   ShoppingBag,
   Info,
 } from "lucide-react";
-import { ConfirmDialog, DelayModal } from "@/components/Dialog";
+import { ConfirmDialog, DelayModal } from "../components/Dialog";
 
 // ── Direction utilities ───────────────────────────────────────────────────────
 

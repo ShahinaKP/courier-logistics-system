@@ -3,15 +3,13 @@ import { fetchPackages } from "../api/packageApi";
 import type { Dashboard as DashboardData, Package } from "../types";
 import PackageCard from "../components/PackageCard";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Truck, Clock3, AlertTriangle } from "lucide-react";
 import {
-  Truck,
-  Clock3,
-  AlertTriangle,
-  MapPin,
-  User,
-  Weight,
-} from "lucide-react";
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../components/ui/card";
 
 interface SectionProps {
   title: string;
