@@ -1,0 +1,146 @@
+name: courier-logistics-system
+
+services:
+  # ===========================================================================
+  # Collection app (Stage 1) — booking, pincodes, auth, raw-update intake
+  # ===========================================================================
+  collection-db:
+    image: postgres:16
+    container_name: courier_collection_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${COLLECTION_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${COLLECTION_DB_PASSWORD:-password}
+      POSTGRES_DB: ${COLLECTION_DB_NAME:-courier_collection}
+    ports:
+      - "${COLLECTION_DB_PORT:-5432}:5432"
+    volumes:
+      - collection_pgdata:/var/lib/postgresql/data
+      # init.sql only runs on a fresh (empty) data volume.
+      - ./courier-collection-app/server/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${COLLECTION_DB_USER:-postgres} -d ${COLLECTION_DB_NAME:-courier_collection}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  collection-server:
+    build:
+      context: ./courier-collection-app/server
+    container_name: courier_collection_server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://${COLLECTION_DB_USER:-postgres}:${COLLECTION_DB_PASSWORD:-password}@collection-db:5432/${COLLECTION_DB_NAME:-courier_collection}
+      JWT_SECRET: ${JWT_SECRET:-courier_secret_key}
+    ports:
+      - "${COLLECTION_SERVER_PORT:-5000}:5000"
+    depends_on:
+      collection-db:
+        condition: service_healthy
+
+  collection-client:
+    build:
+      context: ./courier-collection-app/client
+      args:
+        # Baked into the JS bundle; must be reachable from the browser.
+        VITE_API_URL: ${COLLECTION_API_PUBLIC_URL:-http://localhost:5000/api}
+    container_name: courier_collection_client
+    restart: unless-stopped
+    ports:
+      - "${COLLECTION_CLIENT_PORT:-3000}:80"
+    depends_on:
+      - collection-server
+
+  # One-off seeder. Run with: docker compose --profile seed run --rm collection-seed
+  collection-seed:
+    profiles: ["seed"]
+    build:
+      context: ./courier-collection-app/server
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://${COLLECTION_DB_USER:-postgres}:${COLLECTION_DB_PASSWORD:-password}@collection-db:5432/${COLLECTION_DB_NAME:-courier_collection}
+      JWT_SECRET: ${JWT_SECRET:-courier_secret_key}
+    command: ["npx", "ts-node", "src/db/seed.ts"]
+    depends_on:
+      collection-db:
+        condition: service_healthy
+
+  # ===========================================================================
+  # Logistics app (Stage 2) — bags, trucks, regions, routing + ETL push
+  # ===========================================================================
+  logistics-db:
+    image: postgres:16
+    container_name: courier_logistics_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${LOGISTICS_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${LOGISTICS_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${LOGISTICS_DB_NAME:-courier_logistics}
+    ports:
+      - "${LOGISTICS_DB_PORT:-5433}:5432"
+    volumes:
+      - logistics_pgdata:/var/lib/postgresql/data
+      - ./courier-logistics-app/server/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${LOGISTICS_DB_USER:-postgres} -d ${LOGISTICS_DB_NAME:-courier_logistics}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  logistics-server:
+    build:
+      context: ./courier-logistics-app/server
+    container_name: courier_logistics_server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5001
+      DATABASE_URL: postgresql://${LOGISTICS_DB_USER:-postgres}:${LOGISTICS_DB_PASSWORD:-postgres}@logistics-db:5432/${LOGISTICS_DB_NAME:-courier_logistics}
+      # The ETL job pushes raw updates to the collection API over the Docker network.
+      COLLECTION_API_URL: http://collection-server:5000/api
+    ports:
+      - "${LOGISTICS_SERVER_PORT:-5001}:5001"
+    depends_on:
+      logistics-db:
+        condition: service_healthy
+      collection-server:
+        condition: service_started
+
+  logistics-client:
+    build:
+      context: ./courier-logistics-app/client
+      args:
+        VITE_API_URL: ${LOGISTICS_API_PUBLIC_URL:-http://localhost:5001/api}
+    container_name: courier_logistics_client
+    restart: unless-stopped
+    ports:
+      - "${LOGISTICS_CLIENT_PORT:-3001}:80"
+    depends_on:
+      - logistics-server
+
+  # One-off seeder. Run with: docker compose --profile seed run --rm logistics-seed
+  logistics-seed:
+    profiles: ["seed"]
+    build:
+      context: ./courier-logistics-app/server
+      target: builder
+    environment:
+      DATABASE_URL: postgresql://${LOGISTICS_DB_USER:-postgres}:${LOGISTICS_DB_PASSWORD:-postgres}@logistics-db:5432/${LOGISTICS_DB_NAME:-courier_logistics}
+    command: ["npx", "ts-node", "src/db/seed.ts"]
+    depends_on:
+      logistics-db:
+        condition: service_healthy
+
+volumes:
+  collection_pgdata:
+  logistics_pgdata:
