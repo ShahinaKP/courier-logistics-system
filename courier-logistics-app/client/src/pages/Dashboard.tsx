@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Inbox,
   RefreshCw,
+  Truck,
 } from "lucide-react";
 
 const statusLabel: Record<string, string> = {
@@ -125,6 +126,7 @@ const Dashboard = () => {
     new_in_window: Package[];
     unbagged: Package[];
     bagged: Package[];
+    in_transit: Package[];
     delayed: Package[];
   } | null>(null);
 
@@ -169,6 +171,12 @@ const Dashboard = () => {
       sub: "In sealed bags",
     },
     {
+      label: "In Transit",
+      count: dashboard.in_transit.length,
+      icon: <Truck className="h-5 w-5 text-green-500" />,
+      sub: "Departed / between hubs",
+    },
+    {
       label: "Delayed",
       count: dashboard.delayed.length,
       icon: <AlertTriangle className="h-5 w-5 text-red-500" />,
@@ -194,7 +202,7 @@ const Dashboard = () => {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {stats.map((s) => (
           <Card key={s.label}>
             <CardHeader className="pb-2">
@@ -225,6 +233,11 @@ const Dashboard = () => {
         title="Bagged Packages"
         packages={dashboard.bagged}
         icon={<ShoppingBag className="h-4 w-4 text-blue-500" />}
+      />
+      <Section
+        title="In Transit ( Departed on truck / between hubs )"
+        packages={dashboard.in_transit}
+        icon={<Truck className="h-4 w-4 text-green-500" />}
       />
       <Section
         title="Delayed Packages"

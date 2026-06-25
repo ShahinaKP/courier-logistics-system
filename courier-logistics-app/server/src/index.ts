@@ -31,15 +31,18 @@ app.listen(PORT, () => {
 });
 
 // ETL job — push updates to Stage 1 every 1 minute
+const COLLECTION_API_URL =
+  process.env.COLLECTION_API_URL || "http://localhost:5000/api";
+
+let lastSyncedAt = new Date(0);
+
 const runETLJob = async () => {
   try {
-    const { PrismaClient } = await import("@prisma/client");
     const packages = await prisma.package.findMany({
       where: {
-        updated_at: {
-          gte: new Date(Date.now() - 60 * 1000), // last 1 minute
-        },
+        updated_at: { gt: lastSyncedAt },
       },
+      orderBy: { updated_at: "asc" },
     });
 
     if (packages.length === 0) {
@@ -54,20 +57,34 @@ const runETLJob = async () => {
       delay_reason: p.delay_reason,
     }));
 
-    const response = await fetch(
-      "http://localhost:5000/api/packages/raw-updates",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updates),
-      },
-    );
+    const response = await fetch(`${COLLECTION_API_URL}/packages/raw-updates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
 
-    console.log(`ETL: Pushed ${updates.length} updates to Stage 1`);
+    if (!response.ok) {
+      // Leave the watermark untouched so the next run retries these records.
+      console.error(
+        `ETL: collection app responded ${response.status} — will retry next run`,
+      );
+      return;
+    }
+
+    // Advance the watermark only after a confirmed successful push.
+    const newest = packages[packages.length - 1].updated_at;
+    if (newest) lastSyncedAt = newest;
+
+    console.log(
+      `ETL: Pushed ${updates.length} update(s) to Stage 1 at ${COLLECTION_API_URL}`,
+    );
   } catch (err) {
-    console.error("ETL job failed:", err);
+    // Network/other failure — keep the watermark so the next run retries.
+    console.error("ETL job failed (will retry next run):", err);
   }
 };
 
 setInterval(runETLJob, 60 * 1000);
-console.log("ETL job started — pushing updates every 1 minute");
+console.log(
+  `ETL job started — pushing updates every 1 minute to ${COLLECTION_API_URL}`,
+);

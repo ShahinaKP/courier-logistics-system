@@ -4,6 +4,7 @@ import {
   getPackageByTrackingId,
   createPackage,
   receiveRawUpdates,
+  resyncToLogistics,
 } from "../controllers/packageController";
 
 import { authenticate, requireStaff } from "../middleware/authMiddleware";
@@ -17,6 +18,7 @@ router.post("/raw-updates", receiveRawUpdates);
 // Staff only routes
 router.get("/", authenticate, requireStaff, getAllPackages);
 router.post("/", authenticate, requireStaff, createPackage);
+router.post("/resync", authenticate, requireStaff, resyncToLogistics);
 router.get("/:trackingId", authenticate, requireStaff, getPackageByTrackingId);
 
 export default router;

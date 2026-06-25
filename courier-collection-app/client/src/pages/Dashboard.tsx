@@ -4,7 +4,7 @@ import type { Dashboard as DashboardData, Package } from "../types";
 import PackageCard from "../components/PackageCard";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Truck, Clock3, AlertTriangle } from "lucide-react";
+import { Truck, Clock3, AlertTriangle, PackageCheck } from "lucide-react";
 
 interface SectionProps {
   title: string;
@@ -76,7 +76,7 @@ const Dashboard = () => {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader>
             <CardTitle className="flex">
@@ -88,6 +88,18 @@ const Dashboard = () => {
             <p className="text-3xl font-bold">
               {dashboard.to_be_picked_up.length}
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex">
+              Collected
+              <PackageCheck className="h-5 w-5 ml-2 text-amber-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{dashboard.collected.length}</p>
           </CardContent>
         </Card>
 
@@ -121,6 +133,11 @@ const Dashboard = () => {
       <Section
         title="📬 Awaiting Pickup"
         packages={dashboard.to_be_picked_up}
+      />
+
+      <Section
+        title="📦 Collected (processing at hub)"
+        packages={dashboard.collected}
       />
 
       <Section title="🚚 Active Deliveries" packages={dashboard.active} />

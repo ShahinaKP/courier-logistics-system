@@ -1,6 +1,43 @@
 import { Request, Response } from "express";
 import prisma from "../db/prisma";
 
+const LOGISTICS_WEBHOOK_URL = process.env.LOGISTICS_APP_URL
+  ? `${process.env.LOGISTICS_APP_URL}/api/packages/webhook`
+  : "http://localhost:5001/api/packages/webhook";
+
+// Push a single package to the logistics (Stage 2) webhook.
+async function sendPackageToLogistics(pkg: {
+  tracking_id: string;
+  sender_name: string;
+  sender_address: string;
+  sender_pincode: string;
+  receiver_name: string;
+  receiver_address: string;
+  receiver_pincode: string;
+  destination_region_id: number | null;
+  weight: unknown;
+}) {
+  const res = await fetch(LOGISTICS_WEBHOOK_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tracking_id: pkg.tracking_id,
+      sender_name: pkg.sender_name,
+      sender_address: pkg.sender_address,
+      sender_pincode: pkg.sender_pincode,
+      receiver_name: pkg.receiver_name,
+      receiver_address: pkg.receiver_address,
+      receiver_pincode: pkg.receiver_pincode,
+      destination_region_id: pkg.destination_region_id,
+      weight: pkg.weight,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Logistics webhook responded ${res.status}`);
+  }
+  return res;
+}
+
 export const getAllPackages = async (
   req: Request,
   res: Response,
@@ -13,8 +50,17 @@ export const getAllPackages = async (
 
     const dashboard = {
       to_be_picked_up: packages.filter((p) => p.status === "to_be_picked_up"),
+      // Collected by logistics, being processed at a hub, not yet dispatched.
+      collected: packages.filter((p) =>
+        ["picked_up", "added_to_bag"].includes(p.status),
+      ),
       active: packages.filter((p) =>
-        ["picked_up", "added_to_bag", "en_route", "arrived"].includes(p.status),
+        [
+          "en_route",
+          "arrived",
+          "scheduled_for_delivery",
+          "out_for_delivery",
+        ].includes(p.status),
       ),
       delayed: packages.filter((p) => p.delay_reason !== null),
     };
@@ -99,26 +145,7 @@ export const createPackage = async (
 
     // Call Stage 2 webhook — pass pincodes and destination region
     try {
-      await fetch(
-        process.env.LOGISTICS_APP_URL
-          ? `${process.env.LOGISTICS_APP_URL}/api/packages/webhook`
-          : "http://localhost:5001/api/packages/webhook",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tracking_id: newPackage.tracking_id,
-            sender_name: newPackage.sender_name,
-            sender_address: newPackage.sender_address,
-            sender_pincode: newPackage.sender_pincode,
-            receiver_name: newPackage.receiver_name,
-            receiver_address: newPackage.receiver_address,
-            receiver_pincode: newPackage.receiver_pincode,
-            destination_region_id: newPackage.destination_region_id,
-            weight: newPackage.weight,
-          }),
-        },
-      );
+      await sendPackageToLogistics(newPackage);
       console.log("Webhook sent to Stage 2 successfully");
     } catch (webhookErr) {
       console.error("Webhook to Stage 2 failed:", webhookErr);
@@ -192,5 +219,40 @@ export const processRawUpdates = async () => {
     }
   } catch (err) {
     console.error("Error processing raw updates:", err);
+  }
+};
+
+// POST /api/packages/resync — backfill: re-push every package to the logistics
+export const resyncToLogistics = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const packages = await prisma.package.findMany({
+      orderBy: { created_at: "asc" },
+    });
+
+    let synced = 0;
+    const failed: string[] = [];
+
+    for (const pkg of packages) {
+      try {
+        await sendPackageToLogistics(pkg);
+        synced++;
+      } catch (err) {
+        console.error(`Resync failed for ${pkg.tracking_id}:`, err);
+        failed.push(pkg.tracking_id);
+      }
+    }
+
+    res.json({
+      message: "Resync complete",
+      total: packages.length,
+      synced,
+      failed,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
   }
 };

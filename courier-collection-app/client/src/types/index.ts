@@ -42,6 +42,7 @@ export type PackageStatus =
 
 export interface Dashboard {
   to_be_picked_up: Package[];
+  collected: Package[];
   active: Package[];
   delayed: Package[];
 }

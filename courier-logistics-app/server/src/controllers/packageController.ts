@@ -36,6 +36,9 @@ export const getAllPackages = async (
             (p.created_at === null || p.created_at < currentWindowStart),
         ),
         bagged: packages.filter((p) => p.status === "added_to_bag"),
+        in_transit: packages.filter((p) =>
+          ["en_route", "arrived"].includes(p.status),
+        ),
         delayed: packages.filter((p) => p.delay_reason !== null),
       },
     });
