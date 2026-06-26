@@ -8,12 +8,18 @@ import {
 } from "../controllers/packageController";
 
 import { authenticate, requireStaff } from "../middleware/authMiddleware";
+import { verifySignature } from "../middleware/verifySignature";
+
+const verifyEtl = verifySignature(
+  process.env.ETL_API_KEY || "",
+  process.env.ETL_API_SECRET || "",
+);
 
 const router = Router();
 
 // Public route
 router.get("/track/:trackingId", getPackageByTrackingId);
-router.post("/raw-updates", receiveRawUpdates);
+router.post("/raw-updates", verifyEtl, receiveRawUpdates);
 
 // Staff only routes
 router.get("/", authenticate, requireStaff, getAllPackages);

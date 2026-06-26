@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../db/prisma";
+import { signedPost } from "../lib/signedPost";
 
 const LOGISTICS_WEBHOOK_URL = process.env.LOGISTICS_APP_URL
   ? `${process.env.LOGISTICS_APP_URL}/api/packages/webhook`
@@ -17,10 +18,9 @@ async function sendPackageToLogistics(pkg: {
   destination_region_id: number | null;
   weight: unknown;
 }) {
-  const res = await fetch(LOGISTICS_WEBHOOK_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+  const res = await signedPost(
+    LOGISTICS_WEBHOOK_URL,
+    {
       tracking_id: pkg.tracking_id,
       sender_name: pkg.sender_name,
       sender_address: pkg.sender_address,
@@ -30,8 +30,10 @@ async function sendPackageToLogistics(pkg: {
       receiver_pincode: pkg.receiver_pincode,
       destination_region_id: pkg.destination_region_id,
       weight: pkg.weight,
-    }),
-  });
+    },
+    process.env.WEBHOOK_API_KEY || "",
+    process.env.WEBHOOK_API_SECRET || "",
+  );
   if (!res.ok) {
     throw new Error(`Logistics webhook responded ${res.status}`);
   }

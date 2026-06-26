@@ -10,12 +10,14 @@ import truckRoutes from "./routes/truckRoutes";
 import regionRoutes from "./routes/regionRoutes";
 
 import prisma from "./db/prisma";
+import { captureRawBody } from "./middleware/verifySignature";
+import { signedPost } from "./lib/signedPost";
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ verify: captureRawBody }));
 
 app.use("/api/packages", packageRoutes);
 app.use("/api/bags", bagRoutes);
@@ -57,11 +59,12 @@ const runETLJob = async () => {
       delay_reason: p.delay_reason,
     }));
 
-    const response = await fetch(`${COLLECTION_API_URL}/packages/raw-updates`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
+    const response = await signedPost(
+      `${COLLECTION_API_URL}/packages/raw-updates`,
+      updates,
+      process.env.ETL_API_KEY || "",
+      process.env.ETL_API_SECRET || "",
+    );
 
     if (!response.ok) {
       // Leave the watermark untouched so the next run retries these records.

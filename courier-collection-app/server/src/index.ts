@@ -8,6 +8,7 @@ import packageRoutes from "./routes/packageRoutes";
 import { processRawUpdates } from "./controllers/packageController";
 import authRoutes from "./routes/authRoutes";
 import pincodeRoutes from "./routes/pincodeRoutes";
+import { captureRawBody } from "./middleware/verifySignature";
 
 // Run ETL processor every 1 minute
 setInterval(processRawUpdates, 60 * 1000);
@@ -17,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ verify: captureRawBody }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/packages", packageRoutes);
