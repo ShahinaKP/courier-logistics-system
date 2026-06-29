@@ -13,7 +13,7 @@ services:
       POSTGRES_PASSWORD: ${COLLECTION_DB_PASSWORD:-password}
       POSTGRES_DB: ${COLLECTION_DB_NAME:-courier_collection}
     ports:
-      - "${COLLECTION_DB_PORT:-5432}:5432"
+      - "${COLLECTION_DB_PORT:-5434}:5432"
     volumes:
       - collection_pgdata:/var/lib/postgresql/data
       # init.sql only runs on a fresh (empty) data volume.
